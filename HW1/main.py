@@ -1,15 +1,13 @@
 import random
-import os
 import torch
 import torch.nn as nn
 import argparse
 import json
 import numpy as np
-import os
 import matplotlib.pyplot as plt
 
 
-def generate_data(seed, train_size, test_size):
+def generate_data(seed, train_size, test_size, swap=False):
     # Generate a dataset for binary multiplication
     # Takes seed, for the random number generator, and
     #       train_size, for the number of training samples to generate
@@ -26,8 +24,12 @@ def generate_data(seed, train_size, test_size):
 
     for i in range(train_size + test_size):
         # Generate two random 8-bit binary numbers A and B
-        A = [random.randint(0, 1) for _ in range(8)]
-        B = [random.randint(0, 1) for _ in range(8)]
+        if not swap:
+            B = [random.randint(0, 1) for _ in range(8)]
+            A = [random.randint(0, 1) for _ in range(8)]
+        else:
+            A = [random.randint(0, 1) for _ in range(8)]
+            B = [random.randint(0, 1) for _ in range(8)]
         # Interleave bits of A and B to obtain the input
         AB_braided = [bit for pair in zip(A, B) for bit in pair]
 
@@ -157,5 +159,16 @@ def main():
     # Plot the training and testing losses
     plt.plot(epochNumber, trainingLosses, label = 'Training Loss')
     plt.plot(epochNumber, testingLosses, label = 'Testing Loss')
+    
+    # Run swapped test by switching B and A
+    print('============ Running swapped test =============\n\n')
+    train_data, train_target, test_data, test_target = generate_data(args.seed, args.train_size, args.test_size, swap=True)
+    swapTestedModel, trainingLosses, testingLosses, epochNumber = train_model(train_data, train_target, test_data, test_target, params['model'], params['optim'])
+    
+    # Plot the training and testing losses
+    plt.plot(epochNumber, trainingLosses, label = 'Swapped Training Loss')
+    plt.plot(epochNumber, testingLosses, label = 'Swapped Testing Loss')
+    
+    
 if __name__ == '__main__':
     main()
