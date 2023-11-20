@@ -1,7 +1,7 @@
 # PHYS449 Machine Learning in Physics
 
-- name: *your name*
-- student ID: *your student ID*
+- name: Aaron Herschberger 
+- student ID: 20778142
 
 ## Instructions
 
