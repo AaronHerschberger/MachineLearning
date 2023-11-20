@@ -6,63 +6,74 @@ import random as rand
 import numpy as np
 
 def MCMC(out_size,N,J, beta = 1.0, verbose = False):
+    # Initialize the state with random spins
+    init_state = rand.choice([-1,1], size = N)
+    if verbose:
+        print('J:',J)
+        print('init state: ',init_state)
 
-        init_state = rand.choice([-1,1], size = N)
-        if verbose:
-            print('J:',J)
-            print('init state: ',init_state)
+    accepted = np.zeros(N)
+    # Run the MCMC until we have enough accepted states
+    while (accepted.size/N) <= out_size:
+        # Select a random spin to flip
+        index = rand.randint(N)
 
-        accepted = np.zeros(N)
-        while (accepted.size/N) <= out_size:
+        # Calculate the change in energy if we flip this spin
+        n = init_state[index]
+        nleft = init_state[(index-1)%N]
+        jleft = J[(index-1)%N]
+        nright = init_state[(index+1)%N]
+        jright = J[index]
+        dE = deltaE(n,jleft,jright,nleft,nright)
 
-            index = rand.randint(N)
+        # If the energy decreases, accept the new state
+        if dE < 0:
+            new_state = init_state
+            new_state[index] = -1
+            accepted = np.concatenate((accepted,new_state))
 
-            n = init_state[index]
+            if verbose:
+                print('New state: {} dE: {}'.format(new_state,dE))
+        # If the energy increases, accept the new state with a certain probability
+        elif rand.random() < np.exp(-beta*dE):
+            new_state = init_state
+            new_state[index] *= -1
 
-            nleft = init_state[(index-1)%N]
-            jleft = J[(index-1)%N]
-            nright = init_state[(index+1)%N]
-            jright = J[index]
-            dE = deltaE(n,jleft,jright,nleft,nright)
-
-            if dE < 0:
-                new_state = init_state
-                new_state[index] = -1
-                accepted = np.concatenate((accepted,new_state))
-
-                if verbose:
-                    print('New state: {} dE: {}'.format(new_state,dE))
-            elif rand.random() < np.exp(-betadE):
-                new_state = init_state
-                new_state[index] *= -1
-
-                accepted = np.concatenate((accepted,new_state))
-                if verbose:
-                    print('New state: {} dE: {}'.format(new_state,dE))
-            else:
-                pass
-        return accepted.reshape((-1,N))[1:]
+            accepted = np.concatenate((accepted,new_state))
+            if verbose:
+                print('New state: {} dE: {}'.format(new_state,dE))
+        else:
+            pass
+    return accepted.reshape((-1,N))[1:]
 
 def deltaE(spin, jl, spinl, jr, spinr):
-        return 2 * spin * (jl * spinl + jr * spinr)
+    # Calculate the change in energy if we flip a spin
+    return 2 * spin * (jl * spinl + jr * spinr)
 
 class BoltzmannMachine:
     def __init__(self, size):
+        # Initialize the weights randomly
         self.weights = Variable(torch.randn(size, size), requires_grad=True)
 
     def energy(self, spins):
+        # Calculate the energy of a state
         return -torch.sum(self.weights * spins)
 
     def update(self, spins, learning_rate):
+        # Calculate the energy of the state
         energy = self.energy(spins)
+        # Compute the gradients
         energy.backward()
         with torch.no_grad():
+            # Update the weights using gradient descent
             self.weights -= learning_rate * self.weights.grad
+            # Reset the gradients to zero
             self.weights.grad.zero_()
 
 def load_data(filename):
     with open(filename, 'r') as f:
         lines = f.readlines()
+    # Convert the data to a list of spin configurations
     data = [[-1 if spin == '-' else 1 for spin in line.strip()] for line in lines]
     return data
 
@@ -71,13 +82,20 @@ def train(model, data, learning_rate, epochs):
     for epoch in range(epochs):
         loss = 0
         for spins in data:
+            # Convert the spins to a PyTorch tensor
             spins = torch.tensor(spins, dtype=torch.float32)
+            # Calculate the energy of the state
             energy = model.energy(spins)
+            # Accumulate the loss
             loss += energy
+        # Compute the gradients
         loss.backward()
         with torch.no_grad():
+            # Update the weights using gradient descent
             model.weights -= learning_rate * model.weights.grad
+            # Reset the gradients to zero
             model.weights.grad.zero_()
+        # Record the loss for this epoch
         losses.append(loss.item())
     return losses
 
@@ -90,7 +108,7 @@ def predict(model, spins):
         energy = model.energy(spins)
     # Return a dictionary of predicted coupler values
     print(model.weights)
-    return {tuple(pair): weight.item() for pair, weight in zip(spins, model.weights)}
+    return {row: model.weights for row in spins}
 
 def main():
     # Create a parser for command line arguments
