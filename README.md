@@ -3,5 +3,5 @@
 - name: Aaron Herschberger 
 - student ID: 20778142
 
-## Instructions
-Assignments 1-3 are in the "Assignment" folder, in their own folders "HW1" - "HW3"
+## Note:
+Assignment 3 is in the "Assignment" folder
