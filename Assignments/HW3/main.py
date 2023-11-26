@@ -22,13 +22,17 @@ class VAE(nn.Module):
         
         self.input_dim = input_dim
         
+        self.hid_2mu = nn.Linear(200, 2)
+        self.hid_2sigma = nn.Linear(200, 2)
+        
         # Encode function
         self.in2hidden = nn.Sequential(
             nn.Linear(input_dim, hidden_dim),
             nn.ReLU(),
-            nn.Linear(400, 400),
+            nn.Linear(hidden_dim, 20 + 20),
             nn.ReLU(),
-            nn.Linear(400, 20*2)
+            nn.Linear(20 + 20, 20 + 20),
+            nn.ReLU()
         )
         
         # Decode function
@@ -44,8 +48,10 @@ class VAE(nn.Module):
     def endode(self, x):
         hidden = self.in2hidden(x)
         mu = funcs.relu(hidden[:, :20])
-        
-        return mu
+
+        mu = self.hid_2mu(hidden)
+        sigma = self.hid_2sigma(hidden)
+        return mu, sigma
     
     def decode(self, z):
         hidden = self.latent2hidden(z)
@@ -54,11 +60,11 @@ class VAE(nn.Module):
         return output
     
     def forward(self, x):
-        mu_logvar = self.encoder(x.view(-1, 784))
+        mu_logvar = self.endode(x.view(-1, INPUT_DIM))
         mu = mu_logvar[:, :20]
         logvar = mu_logvar[:, 20:]
         z = self.reparameterize(mu, logvar)
-        return self.decoder(z), mu, logvar
+        return self.decode(z), mu, logvar
 
     # def reparameterize(self, mu, logvar):
     #     std = torch.exp(0.5*logvar)
@@ -90,7 +96,7 @@ def train(model, loss_func, optimizer, num_epochs, verbose=False):
         loop = trainset
         for line in loop:
             # Forward pass
-            line = line.to(device).view(-1, INPUT_DIM)
+            line = torch.Tensor(line).to(device).view(-1, INPUT_DIM)
             # Update z, mu, and sigma
             x_reconst, mu, sigma = model(line)
 
@@ -142,7 +148,7 @@ def inference(model, digit, num_examples=1):
         
 
 BATCH_SIZE = 29492
-INPUT_DIM = 196
+INPUT_DIM = 197
 LR_RATE = 0.001
 NUM_EPOCHS = 10
 inputFile = 'data/even_mnist.csv'
