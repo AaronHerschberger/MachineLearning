@@ -1,4 +1,5 @@
 # Problem Statement and Solution Methodology
+(Note that the final line of main.py, line 154, is commented out as the inference function broke last minute.)
 The goal of this VAE is to draw the even digits, 0,2,4,6,8, based on the training from the MNSIT dataset (after resizing it to 14 x 14).
 
 Each image as a flattened list of 196 values, valued from 0 to 255 (representing how dark the pixel is). 
