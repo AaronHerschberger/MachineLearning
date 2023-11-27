@@ -1,4 +1,3 @@
-import argparse
 import torch
 import torch.nn as nn
 import torch.nn.functional as funcs
@@ -10,10 +9,10 @@ from torchvision.utils import save_image
 import torchvision.datasets as datasets
 from torchvision.datasets import ImageFolder
 
+import matplotlib.pyplot as plt
 from tqdm import tqdm
-
+import argparse
 from VAEclass import VAE
-
 
 
 def prepare_data(list_from_csv):
@@ -27,16 +26,36 @@ def prepare_data(list_from_csv):
     normalized = map(lambda line: map(lambda num: float(num)/255, line), list(normalized))
     return list(map(list, normalized))
 
+# Declare global variables
+BATCH_SIZE = 29492
+INPUT_DIM = 197 # 14*14 = 196 + 1 for label
+LR_RATE = 0.001
+NUM_EPOCHS = 10
+inputFile = 'data/even_mnist.csv'
 
-def train(model, loss_func, optimizer, num_epochs, verbose=True):
+trainset = list(open(inputFile, 'r'))
+trainset = prepare_data(trainset)
+data_loader = DataLoader(dataset=trainset, batch_size=BATCH_SIZE, shuffle=False)
+device = torch.device('cpu')
+
+myTransform = transforms.Compose([
+    transforms.ToTensor(),
+    transforms.Normalize((0.5,), (0.5,))
+])
+
+def train(model, loss_func, optimizer, num_epochs=NUM_EPOCHS, verbose=True):
     """
     Trains the model for num_epochs epochs. 
+    
+    Takes an empty VAE model, a loss function, an optimizer, and the number of epochs to train for.
+    
+    Returns a list containing the loss values at each epoch.
     """
     # Start training
     for epoch in range(num_epochs):
         # loop is the input data; tqdm is a progress bar for visualization.
-        # loop = tqdm(enumerate(data_loader))
         
+        lossList = []
         loop = trainset
         for line in loop:
             # Forward pass
@@ -55,15 +74,19 @@ def train(model, loss_func, optimizer, num_epochs, verbose=True):
             optimizer.step()
             # loop.set_postfix(loss=loss.item())
         
-        # if verbose:
-        print('Epoch: {} Average loss: {:.4f}'.format(epoch+1, loss.item()))
+        if True:
+            print('Epoch: {}, Average loss: {:.4f}'.format(epoch+1, loss.item()))
+            
+        lossList.append(loss.item())
+        
+    return lossList
     
 def inference(model, num_examples=100):
     """
     Takes a trained model, Generates num_examples of MNIST-like digits.
-    Specifically we extract an example of each digit,
-    then after we have the mu, sigma representation for
-    each digit we can sample from that.
+    Specifically we iterate over each digit,
+    then since we have the mu & sigma representation for
+    each digit we can sample from the distribution to generate.
 
     After we sample we can run the decoder part of the VAE
     and generate examples.
@@ -72,66 +95,61 @@ def inference(model, num_examples=100):
     digit = 0
     images = []
     idx = 0
-    for x, y in trainset:
-        if y == idx:
+    # Get images of each even digit from 0 to 8
+    for x in trainset:
+        if x[-1] == idx: # label is last element
             images.append(x)
-            idx += 1
-        if idx == 2:
+            idx += 2
+        if idx == 8:
             break
 
     encodings_digit = []
     for d in range(2):
         with torch.no_grad():
-            mu, sigma = model.encode(images[d].view(1, 784))
+            mu, sigma = model.encode(torch.Tensor(images[d]))
         encodings_digit.append((mu, sigma))
 
     mu, sigma = encodings_digit[digit]
+    
+    # Generate num_examples of PDFs by sampling from the distribution of the original
     for example in range(num_examples):
         epsilon = torch.randn_like(sigma)
         z = mu + sigma * epsilon
         out = model.decode(z)
         # out = out.view(-1, 1, 28, 28)
-        save_image(out, f"generated_{digit}_ex{example}.png")
+        save_image(out, f"{example}.pdf")
         
-
-BATCH_SIZE = 29492
-INPUT_DIM = 197
-LR_RATE = 0.001
-NUM_EPOCHS = 100
-inputFile = 'data/even_mnist.csv'
-
-trainset = list(open(inputFile, 'r'))
-trainset = prepare_data(trainset)
-data_loader = DataLoader(dataset=trainset, batch_size=BATCH_SIZE, shuffle=False)
-device = torch.device('cpu')
-
-myTransform = transforms.Compose([
-    transforms.ToTensor(),
-    transforms.Normalize((0.5,), (0.5,))
-])
-
+        
 def main():
+    # Set up command line arguments
     parser = argparse.ArgumentParser(description='Trains a VAE to generate even MNIST digits, then exports a loss plot PDF and n PDFs of generated digits.')
     parser.format_help()
     parser.add_argument('-v', '--verbose', action='store_true', help='print loss values at each epoch')
-    parser.add_argument('-e', type=int, help='number of epochs to train', default=10)
-    parser.add_argument('-n', type=int, help='number of generated digits to export', default=20)
+    parser.add_argument('-e', type=int, help='number of epochs to train', default=3)
+    parser.add_argument('-n', type=int, help='number of generated digits to export', default=100)
     # parser.add_argument('--inputPath', type=str, help='input file', default='data/even_mnist.csv')
-    
     args = parser.parse_args()
-    # global inputFile
-    # inputFile = args.inputPath
     
-    
-
     # initialize model, optimizer, and loss function
     model = VAE(INPUT_DIM, 20, 10).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=LR_RATE)
     loss_fn = nn.BCELoss(reduction="sum")
 
     # Run training
-    train(model, loss_fn, optimizer, NUM_EPOCHS, args.verbose)
+    lossValues = train(model, loss_fn, optimizer, args.e, args.verbose)
+    print(lossValues)
     
+    # Make and Export loss plot
+    def plot_graph(data, filename):
+        plt.figure()
+        plt.plot(range(len(data)), data)
+        plt.xlabel('Epoch')
+        plt.ylabel('Loss')
+        plt.title('Loss Value vs Epoch')
+        plt.savefig(filename, format='pdf')
+    
+    plot_graph(lossValues, 'loss.pdf')
+
     # Run inference
     # inference(model, args.n)
 

@@ -32,7 +32,7 @@ class VAE(nn.Module):
             nn.ReLU()
         )
         
-    def endode(self, x):
+    def encode(self, x):
         """Takes input vector x, outputs mu and sigma: the mean and standard deviation of the latent distribution, which is later sampled (in the "forward" function) to generate a latent vector."""
         hidden = self.in2hidden(x)
 
@@ -52,7 +52,7 @@ class VAE(nn.Module):
     def forward(self, x):
         """Takes input vector x, calls encode, reparameterizes, calls decode,
         and outputs the reconstructed input, mu, and sigma."""
-        mu, sigma = self.endode(x)
+        mu, sigma = self.encode(x)
 
         # Sample from latent distribution from encoder
         epsilon = torch.randn_like(sigma)
