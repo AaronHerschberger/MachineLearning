@@ -11,66 +11,10 @@ import torchvision.datasets as datasets
 from torchvision.datasets import ImageFolder
 
 from tqdm import tqdm
-import csv
 
-from VAEclass import myVAEdef
+from VAEclass import VAE
 
 
-class VAE(nn.Module):
-    def __init__(self, input_dim, hidden_dim, latent_dim):
-        super(VAE, self).__init__()
-        
-        self.input_dim = input_dim
-        
-        self.hid_2mu = nn.Linear(200, 2)
-        self.hid_2sigma = nn.Linear(200, 2)
-        
-        # Encode function
-        self.in2hidden = nn.Sequential(
-            nn.Linear(input_dim, hidden_dim),
-            nn.ReLU(),
-            nn.Linear(hidden_dim, 20 + 20),
-            nn.ReLU(),
-            nn.Linear(20 + 20, 20 + 20),
-            nn.ReLU()
-        )
-        
-        # Decode function
-        self.latent2hidden = nn.Sequential(
-            nn.Linear(20, 400),
-            nn.ReLU(),
-            nn.Linear(400, 400),
-            nn.ReLU(),
-            nn.Linear(400, 784),
-            nn.Sigmoid()
-        )
-        
-    def endode(self, x):
-        hidden = self.in2hidden(x)
-        mu = funcs.relu(hidden[:, :20])
-
-        mu = self.hid_2mu(hidden)
-        sigma = self.hid_2sigma(hidden)
-        return mu, sigma
-    
-    def decode(self, z):
-        hidden = self.latent2hidden(z)
-        output = funcs.sigmoid(hidden)
-        
-        return output
-    
-    def forward(self, x):
-        mu_logvar = self.endode(x.view(-1, INPUT_DIM))
-        mu = mu_logvar[:, :20]
-        logvar = mu_logvar[:, 20:]
-        z = self.reparameterize(mu, logvar)
-        return self.decode(z), mu, logvar
-
-    # def reparameterize(self, mu, logvar):
-    #     std = torch.exp(0.5*logvar)
-    #     eps = torch.rand_like(std)
-    #     return eps.mul(std).add_(mu)
-    
 
 def prepare_data(list_from_csv):
     """Converts listof(str) from csv file to listof(listof(floats)), then 
@@ -78,13 +22,13 @@ def prepare_data(list_from_csv):
     
     # First, split whole file into lines; then split lines into str, convert to 
     # float, and normalize to [0,1] by dividing by 255. In future, 2 for loops 
-    # are much better than map and lambda.
+    # are much easier to implement and read than map and lambda.
     normalized = map(lambda line: line.split(), list_from_csv)
     normalized = map(lambda line: map(lambda num: float(num)/255, line), list(normalized))
     return list(map(list, normalized))
 
 
-def train(model, loss_func, optimizer, num_epochs, verbose=False):
+def train(model, loss_func, optimizer, num_epochs, verbose=True):
     """
     Trains the model for num_epochs epochs. 
     """
@@ -109,13 +53,14 @@ def train(model, loss_func, optimizer, num_epochs, verbose=False):
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-            loop.set_postfix(loss=loss.item())
-            
-        print('Epoch: {} Average loss: {:.4f}'.format(epoch, loss.item()))
+            # loop.set_postfix(loss=loss.item())
+        
+        # if verbose:
+        print('Epoch: {} Average loss: {:.4f}'.format(epoch+1, loss.item()))
     
-def inference(model, digit, num_examples=1):
+def inference(model, num_examples=100):
     """
-    Generates (num_examples) of a particular digit.
+    Takes a trained model, Generates num_examples of MNIST-like digits.
     Specifically we extract an example of each digit,
     then after we have the mu, sigma representation for
     each digit we can sample from that.
@@ -123,6 +68,8 @@ def inference(model, digit, num_examples=1):
     After we sample we can run the decoder part of the VAE
     and generate examples.
     """
+    
+    digit = 0
     images = []
     idx = 0
     for x, y in trainset:
@@ -143,14 +90,14 @@ def inference(model, digit, num_examples=1):
         epsilon = torch.randn_like(sigma)
         z = mu + sigma * epsilon
         out = model.decode(z)
-        out = out.view(-1, 1, 28, 28)
+        # out = out.view(-1, 1, 28, 28)
         save_image(out, f"generated_{digit}_ex{example}.png")
         
 
 BATCH_SIZE = 29492
 INPUT_DIM = 197
 LR_RATE = 0.001
-NUM_EPOCHS = 10
+NUM_EPOCHS = 100
 inputFile = 'data/even_mnist.csv'
 
 trainset = list(open(inputFile, 'r'))
@@ -178,11 +125,14 @@ def main():
     
 
     # initialize model, optimizer, and loss function
-    model = VAE(INPUT_DIM, 50, 10).to(device)
+    model = VAE(INPUT_DIM, 20, 10).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=LR_RATE)
     loss_fn = nn.BCELoss(reduction="sum")
 
     # Run training
     train(model, loss_fn, optimizer, NUM_EPOCHS, args.verbose)
+    
+    # Run inference
+    # inference(model, args.n)
 
 main()
