@@ -17,14 +17,17 @@ In this implementation, reparameterization takes place within (at the end) of th
 
 # Run instructions
 To run with default hyperparameters,
-python main.py -o result_dir -n 100
---------------------------------
+
+## python main.py -o result_dir -n 100
+
 
 To run a verbose version of the program, which prints loss at every training epoch, type:
+
 python main.py --v
 --------------------------------
 
 For more info, type:
+
 python main.py --help
 --------------------------------
 
