@@ -1,7 +1,0 @@
-L2 regularization for the dL(lambda) term
-
-initialize weights to a gaussian random seed
-
-Prob statement mentions structure of original Ising model (e.g. no self couplings so diagonal of matrix is 0's)
-
-100 maybe less iterations for Monte Carlo generating daataset.
